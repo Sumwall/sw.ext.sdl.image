@@ -1,0 +1,17 @@
+name: Task - Documentation
+description: Documenting features, tasks, architecture, howto's, etc. is extremely important
+title: '[doc]: short issue description'
+labels: ["task", "documentation"]
+# If you have the redhat.vscode-yaml extension next line will be marked as error
+# Ignore it by now... it's an upstream bug https://github.com/SchemaStore/schemastore/issues/3737
+projects: ["Sumwall/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reminder: once Issue is created, make short-lived local branch i.e.: `git checkout -b <type>/#issueID-short-title`. Types can be: `hotfix, bugfix, enhance, doc, fixes/closes/resolves`. Check on our [recommended GitHub workflow](https://github.com/Sumwall/sumwall.project/blob/main/02.technology/03.git-workflow.md).
+  - type: textarea
+    attributes:
+      label: Describe here the objective of this documentation task
+    validations:
+      required: true

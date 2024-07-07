@@ -1,0 +1,31 @@
+name: Story
+description: A story is a short, comprehensible description of a feature from an end user's perspective.
+title: '[STORY]: short story description'
+labels: ["story"]
+# If you have the redhat.vscode-yaml extension next line will be marked as error
+# Ignore it by now... it's an upstream bug https://github.com/SchemaStore/schemastore/issues/3737
+projects: ["Sumwall/1"]
+body:
+  - type: textarea
+    attributes:
+      label: Objective of this story
+      description: What do you expect to happen?
+      placeholder: Tell us your objective!
+      value: "A description goes here!"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance criteria
+      description: Optional
+      placeholder: Describe the acceptance criteria
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Any related Issue
+      description: Optional
+      placeholder: List the tasks related to this feature
+      value: "* #issueId -  Related issue."
+    validations:
+      required: false
