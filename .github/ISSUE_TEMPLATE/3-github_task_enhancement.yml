@@ -1,0 +1,26 @@
+name: Task - Enhancement
+description: An Enhacement Task is a standalone smaller unit of work or derived from a user story/feature.
+title: '[enhance]: short enhancement description'
+labels: ["task", "enhancement"]
+# If you have the redhat.vscode-yaml extension next line will be marked as error
+# Ignore it by now... it's an upstream bug https://github.com/SchemaStore/schemastore/issues/3737
+projects: ["Sumwall/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reminder: once Issue is created, make short-lived local branch i.e.: `git checkout -b <type>/#issueID-short-title`. Types can be: `hotfix, bugfix, enhance, doc, fixes/closes/resolves`. Check on our [recommended GitHub workflow](https://github.com/Sumwall/sumwall.project/blob/main/02.technology/03.git-workflow.md).
+  - type: textarea
+    attributes:
+      label: Objective of this enhacement
+      description: What do you expect to happen?
+      placeholder: "Represents specific actions team members need to complete to implement the enhancement. Typically, tasks include technical activities developers must do, such as writing code, testing, documenting, etc. Should be completed within a sprint."
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance criteria
+      description: Optional
+      placeholder: The acceptance criteria
+    validations:
+      required: false

@@ -1,0 +1,27 @@
+name: Task - Hotfix
+description: New issue for a hotfix task
+title: '[hotfix]: short issue description'
+labels: ["task", "hotfix"]
+# If you have the redhat.vscode-yaml extension next line will be marked as error
+# Ignore it by now... it's an upstream bug https://github.com/SchemaStore/schemastore/issues/3737
+projects: ["Sumwall/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reminder: once Issue is created, make short-lived local branch i.e.: `git checkout -b <type>/#issueID-short-title`. Types can be: `hotfix, bugfix, enhance, doc, fixes/closes/resolves`. Check on our [recommended GitHub workflow](https://github.com/Sumwall/sumwall.project/blob/main/02.technology/03.git-workflow.md).
+  - type: textarea
+    attributes:
+      label: Describe here the specific need for this hotfix
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see!
+      value: "Somethign happenend!"
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance criteria
+      description: Optional
+      placeholder: Tell us the acceptance criteria
+    validations:
+      required: false
