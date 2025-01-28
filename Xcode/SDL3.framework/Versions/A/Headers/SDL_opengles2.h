@@ -1,6 +1,6 @@
 /*
-  SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Simple DirectMedia Layer
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -19,20 +19,33 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef SDLIMAGE_IMG_H
-#define SDLIMAGE_IMG_H
+/*
+ * This is a simple file to encapsulate the OpenGL ES 2.0 API headers.
+ */
 
-extern int IMG_InitAVIF(void);
-extern void IMG_QuitAVIF(void);
-extern int IMG_InitJPG(void);
-extern void IMG_QuitJPG(void);
-extern int IMG_InitJXL(void);
-extern void IMG_QuitJXL(void);
-extern int IMG_InitPNG(void);
-extern void IMG_QuitPNG(void);
-extern int IMG_InitTIF(void);
-extern void IMG_QuitTIF(void);
-extern int IMG_InitWEBP(void);
-extern void IMG_QuitWEBP(void);
+#include <SDL3/SDL_platform_defines.h>
 
+#if !defined(_MSC_VER) && !defined(SDL_USE_BUILTIN_OPENGL_DEFINITIONS)
+
+#ifdef SDL_PLATFORM_IOS
+#include <OpenGLES/ES2/gl.h>
+#include <OpenGLES/ES2/glext.h>
+#else
+#include <GLES2/gl2platform.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#endif
+
+#else /* _MSC_VER */
+
+/* OpenGL ES2 headers for Visual Studio */
+#include <SDL3/SDL_opengles2_khrplatform.h>
+#include <SDL3/SDL_opengles2_gl2platform.h>
+#include <SDL3/SDL_opengles2_gl2.h>
+#include <SDL3/SDL_opengles2_gl2ext.h>
+
+#endif /* _MSC_VER */
+
+#ifndef APIENTRY
+#define APIENTRY GL_APIENTRY
 #endif

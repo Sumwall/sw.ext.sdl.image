@@ -36,7 +36,7 @@
       "archs": ["x86", "x64"],
       "args": [
         "-DBUILD_SHARED_LIBS=ON",
-        "-DSDLIMAGE_AVIF=OFF",
+        "-DSDLIMAGE_AVIF=ON",
         "-DSDLIMAGE_BMP=ON",
         "-DSDLIMAGE_GIF=ON",
         "-DSDLIMAGE_JPG=ON",
@@ -48,23 +48,30 @@
         "-DSDLIMAGE_QOI=ON",
         "-DSDLIMAGE_SVG=ON",
         "-DSDLIMAGE_TGA=ON",
-        "-DSDLIMAGE_TIF=OFF",
-        "-DSDLIMAGE_WEBP=OFF",
+        "-DSDLIMAGE_TIF=ON",
+        "-DSDLIMAGE_WEBP=ON",
         "-DSDLIMAGE_XCF=ON",
         "-DSDLIMAGE_XPM=ON",
         "-DSDLIMAGE_XV=ON",
+        "-DSDLIMAGE_RELOCATABLE=ON",
         "-DSDLIMAGE_SAMPLES=OFF",
         "-DSDLIMAGE_TESTS=OFF",
-        "-DSDLIMAGE_VENDORED=OFF"
+        "-DSDLIMAGE_VENDORED=OFF",
+        "-DSDLIMAGE_DEPS_SHARED=ON",
+        "-DCMAKE_C_FLAGS=-I@<@PROJECT_ROOT@>@/VisualC/external/include",
+        "-DSDLIMAGE_DYNAMIC_AVIF=@<@PROJECT_ROOT@>@/VisualC/external/optional/@<@ARCH@>@/libavif-16.dll",
+        "-DSDLIMAGE_DYNAMIC_TIF=@<@PROJECT_ROOT@>@/VisualC/external/optional/@<@ARCH@>@/libtiff-6.dll",
+        "-DSDLIMAGE_DYNAMIC_WEBP=@<@PROJECT_ROOT@>@/VisualC/external/optional/@<@ARCH@>@/libwebp-7.dll",
+        "-DSDLIMAGE_DYNAMIC_WEBPDEMUX=@<@PROJECT_ROOT@>@/VisualC/external/optional/@<@ARCH@>@/libwebpdemux-2.dll"
       ],
       "shared-static": "args"
     },
     "files": {
       "": [
-        "CHANGES.txt",
+        "build-scripts/pkg-support/mingw/INSTALL.md.in:INSTALL.md",
+        "build-scripts/pkg-support/mingw/Makefile",
         "LICENSE.txt",
-        "README.txt",
-        "build-scripts/pkg-support/mingw/Makefile"
+        "README.md"
       ],
       "cmake": [
         "build-scripts/pkg-support/mingw/cmake/SDL3_imageConfig.cmake",
@@ -99,6 +106,7 @@
           "VisualC/external/optional/@<@ARCH@>@/libtiff-6.dll",
           "VisualC/external/optional/@<@ARCH@>@/libwebp-7.dll",
           "VisualC/external/optional/@<@ARCH@>@/libwebpdemux-2.dll",
+          "VisualC/external/optional/@<@ARCH@>@/LICENSE.aom.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.avif.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.dav1d.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.tiff.txt",
@@ -116,6 +124,7 @@
           "VisualC/external/optional/@<@ARCH@>@/libtiff-6.dll",
           "VisualC/external/optional/@<@ARCH@>@/libwebp-7.dll",
           "VisualC/external/optional/@<@ARCH@>@/libwebpdemux-2.dll",
+          "VisualC/external/optional/@<@ARCH@>@/LICENSE.aom.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.avif.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.dav1d.txt",
           "VisualC/external/optional/@<@ARCH@>@/LICENSE.tiff.txt",
@@ -146,6 +155,7 @@
         "-DSDLIMAGE_XCF=ON",
         "-DSDLIMAGE_XPM=ON",
         "-DSDLIMAGE_XV=ON",
+        "-DSDLIMAGE_RELOCATABLE=ON",
         "-DSDLIMAGE_SAMPLES=OFF",
         "-DSDLIMAGE_TESTS=OFF",
         "-DSDLIMAGE_VENDORED=ON"
@@ -160,7 +170,12 @@
           "bin/aom.dll",
           "bin/tiff.dll",
           "bin/libwebp.dll",
-          "bin/libwebpdemux.dll"
+          "bin/libwebpdemux.dll",
+          "share/licenses/SDL3_image/optional/LICENSE.aom.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.avif.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.dav1d.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.tiff.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.webp.txt"
         ]
       },
       "files-devel": {
@@ -175,20 +190,27 @@
           "bin/aom.dll",
           "bin/tiff.dll",
           "bin/libwebp.dll",
-          "bin/libwebpdemux.dll"
+          "bin/libwebpdemux.dll",
+          "share/licenses/SDL3_image/optional/LICENSE.aom.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.avif.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.dav1d.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.tiff.txt",
+          "share/licenses/SDL3_image/optional/LICENSE.webp.txt"
         ]
       }
     },
     "files-lib": {
       "": [
-        "README.txt"
+        "build-scripts/pkg-support/msvc/@<@ARCH@>@/INSTALL.md.in:INSTALL.md",
+        "LICENSE.txt",
+        "README.md"
       ]
     },
     "files-devel": {
       "": [
-        "CHANGES.txt",
+        "build-scripts/pkg-support/msvc/INSTALL.md.in:INSTALL.md",
         "LICENSE.txt",
-        "README.txt"
+        "README.md"
       ],
       "cmake": [
         "build-scripts/pkg-support/msvc/cmake/SDL3_imageConfig.cmake.in:SDL3_imageConfig.cmake",
@@ -260,27 +282,33 @@
       "x86",
       "x86_64"
     ],
-    "api-minimum": 19,
-    "api-target": 29,
+    "api-minimum": 21,
+    "api-target": 35,
     "ndk-minimum": 21,
-    "files": {
+    "aar-files": {
       "": [
-        "build-scripts/pkg-support/android/INSTALL.md.in:INSTALL.md",
-        "build-scripts/pkg-support/android/__main__.py.in:__main__.py",
-        "build-scripts/pkg-support/android/description.json.in:description.json"
+        "build-scripts/pkg-support/android/aar/__main__.py.in:__main__.py",
+        "build-scripts/pkg-support/android/aar/description.json.in:description.json"
       ],
       "META-INF": [
         "LICENSE.txt"
       ],
       "cmake": [
         "cmake/sdlcpu.cmake",
-        "build-scripts/pkg-support/android/cmake/SDL3_imageConfig.cmake",
-        "build-scripts/pkg-support/android/cmake/SDL3_imageConfigVersion.cmake.in:SDL3_imageConfigVersion.cmake"
+        "build-scripts/pkg-support/android/aar/cmake/SDL3_imageConfig.cmake",
+        "build-scripts/pkg-support/android/aar/cmake/SDL3_imageConfigVersion.cmake.in:SDL3_imageConfigVersion.cmake"
+      ]
+    },
+    "files": {
+      "": [
+        "build-scripts/pkg-support/android/INSTALL.md.in:INSTALL.md",
+        "LICENSE.txt",
+        "README.md"
       ]
     },
     "dependencies": {
       "SDL": {
-        "artifact": "SDL3-*.aar"
+        "artifact": "SDL3-devel-*-android.zip"
       }
     }
   }

@@ -21,9 +21,15 @@ jobs:
             cmake: '-DSDLIMAGE_BACKEND_STB=OFF -DSDLIMAGE_BACKEND_WIC=OFF  -DSDLIMAGE_AVIF=ON -G "Ninja Multi-Config"' }
         - { name: Linux,             os: ubuntu-latest,  shell: sh,  vendored: false, cmake: '-GNinja', shared: 1, static: 0, noavif: true, nojxl: true, artifact: 'SDL3_image-linux-x64' }
         - { name: 'Linux (static)',  os: ubuntu-latest,  shell: sh,  vendored: true, cmake: '-DBUILD_SHARED_LIBS=OFF -GNinja', shared: 0, static: 1, artifact: 'SDL3_image-static-linux-x64' }
-        - { name: Macos,             os: macos-latest,   shell: sh,  vendored: false, cmake: '-GNinja', shared: 1, static: 0, artifact: 'SDL3_image-macos' }
+        - { name: Macos,             os: macos-latest,   shell: sh,  vendored: false, cmake: '-DSDLIMAGE_DEPS_SHARED=OFF -GNinja', shared: 1, static: 0, artifact: 'SDL3_image-macos' }
 
     steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: ${{ matrix.platform.vendored && 'recursive' }}
+    - name: Set up ninja
+      if: ${{ !contains(matrix.platform.shell, 'msys2') }}
+      uses: ./.github/actions/setup-ninja
 
     - uses: ilammy/msvc-dev-cmd@v1
       if: ${{ matrix.platform.msvc }}
@@ -49,9 +55,6 @@ jobs:
           ${{ matrix.platform.msys-env }}-libtiff
           ${{ matrix.platform.msys-env }}-libwebp
           ${{ matrix.platform.msys-env }}-zlib
-    - name: Install Ninja
-      uses: aseprite/get-ninja@main
-      if: ${{ !contains(matrix.platform.shell, 'msys2') }}
     - name: Set up SDL
       id: sdl
       uses: libsdl-org/setup-sdl@main
@@ -60,7 +63,7 @@ jobs:
         version: 3-head
         sdl-test: true
         shell: ${{ matrix.platform.shell }}
-    - name: Set up Macos dependencies
+    - name: Set up macOS dependencies
       if: ${{ runner.os == 'macOS' && !matrix.platform.vendored }}
       run: |
         brew install \
@@ -83,10 +86,6 @@ jobs:
     - name: Set up NASM
       uses: ilammy/setup-nasm@v1
       if: ${{ matrix.platform.vendored && !contains(matrix.platform.shell, 'msys2') }}
-
-    - uses: actions/checkout@v4
-      with:
-        submodules: ${{ matrix.platform.vendored && 'recursive' }}
 
     - name: Check that versioning is consistent
       # We only need to run this once: arbitrarily use the Linux build

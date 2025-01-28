@@ -2,7 +2,7 @@
 # This file is meant to be placed in share/cmake/SDL3_image, next to SDL3_image.xcframework
 
 # INTERFACE_LINK_OPTIONS needs CMake 3.12
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.12...3.28)
 
 include(FeatureSummary)
 set_package_properties(SDL3_image PROPERTIES
@@ -129,7 +129,7 @@ if(NOT TARGET SDL3_image::SDL3_image-shared)
         set_target_properties(SDL3_image::SDL3_image-shared
             PROPERTIES
                 FRAMEWORK "TRUE"
-                IMPORTED_LOCATION "${_sdl3_image_framework_path}"
+                IMPORTED_LOCATION "${_sdl3_image_framework_path}/SDL3_image"
         )
     endif()
     set_target_properties(SDL3_image::SDL3_image-shared

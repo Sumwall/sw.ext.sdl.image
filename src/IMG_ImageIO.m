@@ -10,7 +10,6 @@
 #if defined(__APPLE__) && !defined(SDL_IMAGE_USE_COMMON_BACKEND)
 
 #include <SDL3_image/SDL_image.h>
-#include "IMG.h"
 
 // Used because CGDataProviderCreate became deprecated in 10.5
 #include <AvailabilityMacros.h>
@@ -324,11 +323,12 @@ static SDL_Surface* Create_SDL_Surface_From_CGImage_Index(CGImageRef image_ref)
                 if (num_entries > (size_t)palette->ncolors) {
                     num_entries = (size_t)palette->ncolors;
                 }
-                palette->ncolors = num_entries;
+                palette->ncolors = (int)num_entries;
                 for (i = 0, entry = entries; i < num_entries; ++i) {
                     palette->colors[i].r = entry[0];
                     palette->colors[i].g = entry[1];
                     palette->colors[i].b = entry[2];
+                    palette->colors[i].a = SDL_ALPHA_OPAQUE;
                     entry += num_components;
                 }
             }
@@ -355,41 +355,6 @@ static SDL_Surface* Create_SDL_Surface_From_CGImage(CGImageRef image_ref)
     }
 }
 
-
-#ifdef JPG_USES_IMAGEIO
-
-int IMG_InitJPG(void)
-{
-    return 0;
-}
-
-void IMG_QuitJPG(void)
-{
-}
-
-#endif /* JPG_USES_IMAGEIO */
-
-#ifdef PNG_USES_IMAGEIO
-
-int IMG_InitPNG(void)
-{
-    return 0;
-}
-
-void IMG_QuitPNG(void)
-{
-}
-
-#endif /* PNG_USES_IMAGEIO */
-
-int IMG_InitTIF(void)
-{
-    return 0;
-}
-
-void IMG_QuitTIF(void)
-{
-}
 
 static bool Internal_isType (SDL_IOStream *rw_ops, CFStringRef uti_string_to_test)
 {
@@ -494,14 +459,16 @@ static SDL_Surface *LoadImageFromIOStream (SDL_IOStream *rw_ops, CFStringRef uti
     if (hint_dictionary != NULL)
         CFRelease(hint_dictionary);
 
-    if (NULL == image_source)
+    if (NULL == image_source) {
         return NULL;
+    }
 
     CGImageRef image_ref = CreateCGImageFromCGImageSource(image_source);
     CFRelease(image_source);
 
-    if (NULL == image_ref)
+    if (NULL == image_ref) {
         return NULL;
+    }
     SDL_Surface *sdl_surface = Create_SDL_Surface_From_CGImage(image_ref);
     CFRelease(image_ref);
 
@@ -514,14 +481,16 @@ static SDL_Surface* LoadImageFromFile (const char *file)
 
     image_source = CreateCGImageSourceFromFile(file);
 
-    if(NULL == image_source)
+    if (NULL == image_source) {
         return NULL;
+    }
 
     CGImageRef image_ref = CreateCGImageFromCGImageSource(image_source);
     CFRelease(image_source);
 
-    if (NULL == image_ref)
+    if (NULL == image_ref) {
         return NULL;
+    }
     SDL_Surface *sdl_surface = Create_SDL_Surface_From_CGImage(image_ref);
     CFRelease(image_ref);
     return sdl_surface;

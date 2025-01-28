@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -22,14 +22,13 @@
 #if defined(SDL_IMAGE_USE_WIC_BACKEND)
 
 #include <SDL3_image/SDL_image.h>
-#include "IMG.h"
 #define COBJMACROS
 #include <initguid.h>
 #include <wincodec.h>
 
 static IWICImagingFactory* wicFactory = NULL;
 
-static int WIC_Init(void)
+static bool WIC_Init(void)
 {
     if (wicFactory == NULL) {
         HRESULT hr = CoCreateInstance(
@@ -40,49 +39,21 @@ static int WIC_Init(void)
             (void**)&wicFactory
         );
         if (FAILED(hr)) {
-            return -1;
+            return false;
         }
     }
 
-    return 0;
+    return true;
 }
 
+#if 0
 static void WIC_Quit(void)
 {
     if (wicFactory) {
         IWICImagingFactory_Release(wicFactory);
     }
 }
-
-int IMG_InitPNG(void)
-{
-    return WIC_Init();
-}
-
-void IMG_QuitPNG(void)
-{
-    WIC_Quit();
-}
-
-int IMG_InitJPG(void)
-{
-    return WIC_Init();
-}
-
-void IMG_QuitJPG(void)
-{
-    WIC_Quit();
-}
-
-int IMG_InitTIF(void)
-{
-    return WIC_Init();
-}
-
-void IMG_QuitTIF(void)
-{
-    WIC_Quit();
-}
+#endif // 0
 
 bool IMG_isPNG(SDL_IOStream *src)
 {
@@ -214,7 +185,7 @@ static SDL_Surface* WIC_LoadImage(SDL_IOStream *src)
     IWICFormatConverter* formatConverter = NULL;
     UINT width, height;
 
-    if (wicFactory == NULL && (WIC_Init() < 0)) {
+    if (!WIC_Init()) {
         SDL_SetError("WIC failed to initialize!");
         return NULL;
     }

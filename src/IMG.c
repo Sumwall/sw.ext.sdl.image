@@ -1,6 +1,6 @@
 /*
   SDL_image:  An example image loading library for use with SDL
-  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -22,7 +22,6 @@
 /* A simple library to load images of various formats as SDL surfaces */
 
 #include <SDL3_image/SDL_image.h>
-#include "IMG.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -89,70 +88,6 @@ int IMG_Version(void)
     return SDL_IMAGE_VERSION;
 }
 
-static IMG_InitFlags initialized = 0;
-
-IMG_InitFlags IMG_Init(IMG_InitFlags flags)
-{
-    IMG_InitFlags result = 0;
-
-    if (flags & IMG_INIT_AVIF) {
-        if ((initialized & IMG_INIT_AVIF) || IMG_InitAVIF() == 0) {
-            result |= IMG_INIT_AVIF;
-        }
-    }
-    if (flags & IMG_INIT_JPG) {
-        if ((initialized & IMG_INIT_JPG) || IMG_InitJPG() == 0) {
-            result |= IMG_INIT_JPG;
-        }
-    }
-    if (flags & IMG_INIT_JXL) {
-        if ((initialized & IMG_INIT_JXL) || IMG_InitJXL() == 0) {
-            result |= IMG_INIT_JXL;
-        }
-    }
-    if (flags & IMG_INIT_PNG) {
-        if ((initialized & IMG_INIT_PNG) || IMG_InitPNG() == 0) {
-            result |= IMG_INIT_PNG;
-        }
-    }
-    if (flags & IMG_INIT_TIF) {
-        if ((initialized & IMG_INIT_TIF) || IMG_InitTIF() == 0) {
-            result |= IMG_INIT_TIF;
-        }
-    }
-    if (flags & IMG_INIT_WEBP) {
-        if ((initialized & IMG_INIT_WEBP) || IMG_InitWEBP() == 0) {
-            result |= IMG_INIT_WEBP;
-        }
-    }
-    initialized |= result;
-
-    return initialized;
-}
-
-void IMG_Quit(void)
-{
-    if (initialized & IMG_INIT_AVIF) {
-        IMG_QuitAVIF();
-    }
-    if (initialized & IMG_INIT_JPG) {
-        IMG_QuitJPG();
-    }
-    if (initialized & IMG_INIT_JXL) {
-        IMG_QuitJXL();
-    }
-    if (initialized & IMG_INIT_PNG) {
-        IMG_QuitPNG();
-    }
-    if (initialized & IMG_INIT_TIF) {
-        IMG_QuitTIF();
-    }
-    if (initialized & IMG_INIT_WEBP) {
-        IMG_QuitWEBP();
-    }
-    initialized = 0;
-}
-
 #if !defined(__APPLE__) || defined(SDL_IMAGE_USE_COMMON_BACKEND)
 /* Load an image from a file */
 SDL_Surface *IMG_Load(const char *file)
@@ -207,8 +142,9 @@ SDL_Surface *IMG_LoadTyped_IO(SDL_IOStream *src, bool closeio, const char *type)
     /* See whether or not this data source can handle seeking */
     if (SDL_SeekIO(src, 0, SDL_IO_SEEK_CUR) < 0 ) {
         SDL_SetError("Can't seek in this data source");
-        if (closeio)
+        if (closeio) {
             SDL_CloseIO(src);
+        }
         return NULL;
     }
 
@@ -216,7 +152,7 @@ SDL_Surface *IMG_LoadTyped_IO(SDL_IOStream *src, bool closeio, const char *type)
     /*load through preloadedImages*/
     FILE *fp = (FILE *)SDL_GetPointerProperty(SDL_GetIOProperties(src), SDL_PROP_IOSTREAM_STDIO_FILE_POINTER, NULL);
     if (fp) {
-        int w, h, success;
+        int w, h;
         char *data;
         SDL_Surface *surf;
 
@@ -240,20 +176,22 @@ SDL_Surface *IMG_LoadTyped_IO(SDL_IOStream *src, bool closeio, const char *type)
     /* Detect the type of image being loaded */
     for ( i=0; i < SDL_arraysize(supported); ++i ) {
         if (supported[i].is) {
-            if (!supported[i].is(src))
+            if (!supported[i].is(src)) {
                 continue;
+            }
         } else {
             /* magicless format */
-            if (!type || SDL_strcasecmp(type, supported[i].type) != 0)
+            if (!type || SDL_strcasecmp(type, supported[i].type) != 0) {
                 continue;
+            }
         }
 #ifdef DEBUG_IMGLIB
-        fprintf(stderr, "IMGLIB: Loading image as %s\n",
-            supported[i].type);
+        SDL_Log("IMGLIB: Loading image as %s\n", supported[i].type);
 #endif
         image = supported[i].load(src);
-        if (closeio)
+        if (closeio) {
             SDL_CloseIO(src);
+        }
         return image;
     }
 
@@ -350,8 +288,7 @@ IMG_Animation *IMG_LoadAnimationTyped_IO(SDL_IOStream *src, bool closeio, const 
                 continue;
         }
 #ifdef DEBUG_IMGLIB
-        fprintf(stderr, "IMGLIB: Loading image as %s\n",
-            supported_anims[i].type);
+        SDL_Log("IMGLIB: Loading image as %s\n", supported_anims[i].type);
 #endif
         anim = supported_anims[i].load(src);
         if (closeio)
