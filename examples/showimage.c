@@ -63,16 +63,19 @@ int main(int argc, char *argv[])
     SDL_Event event;
     const char *tonemap = NULL;
     const char *saveFile = NULL;
+    int attempted = 0;
     int result = 0;
 
     (void)argc;
 
+#if 0 /* We now allow drag and drop onto the window */
     /* Check command line usage */
-    if ( ! argv[1] ) {
+    if ( !argv[1] ) {
         SDL_Log("Usage: %s [-fullscreen] [-tonemap X] [-save file.png] <image_file> ...\n", argv[0]);
         result = 1;
         goto done;
     }
+#endif
 
     flags = SDL_WINDOW_HIDDEN;
     for ( i=1; argv[i]; ++i ) {
@@ -135,6 +138,7 @@ int main(int argc, char *argv[])
         }
 
         /* Open the image file */
+        ++attempted;
         if (tonemap) {
             SDL_Surface *surface, *temp;
 
@@ -240,6 +244,66 @@ int main(int argc, char *argv[])
                         break;
                 }
             }
+            /* Draw a background pattern in case the image has transparency */
+            draw_background(renderer, (int)w, (int)h);
+
+            /* Display the image */
+            SDL_RenderTexture(renderer, texture, NULL, NULL);
+            SDL_RenderPresent(renderer);
+
+            SDL_Delay(100);
+        }
+        SDL_DestroyTexture(texture);
+        texture = NULL;
+    }
+
+    if (attempted == 0 && !quit) {
+        /* Show the window if needed */
+        SDL_SetWindowTitle(window, "showimage");
+        w = 640.0f;
+        h = 480.0f;
+        SDL_SetWindowSize(window, (int)w, (int)h);
+        SDL_ShowWindow(window);
+
+        while ( !done ) {
+            while ( SDL_PollEvent(&event) ) {
+                switch (event.type) {
+                    case SDL_EVENT_DROP_FILE:
+                        {
+                            const char *file = event.drop.data;
+
+                            SDL_DestroyTexture(texture);
+
+                            SDL_Log("Loading %s\n", file);
+                            texture = IMG_LoadTexture(renderer, file);
+                            if (!texture) {
+                                SDL_Log("Couldn't load %s: %s\n", file, SDL_GetError());
+                                break;
+                            }
+                            SDL_SetWindowTitle(window, file);
+                            SDL_GetTextureSize(texture, &w, &h);
+                            SDL_SetWindowSize(window, (int)w, (int)h);
+                        }
+                        break;
+                    case SDL_EVENT_KEY_UP:
+                        switch (event.key.key) {
+                        case SDLK_ESCAPE:
+                        case SDLK_Q:
+                            done = 1;
+                            break;
+                        }
+                        break;
+                    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                        done = 1;
+                        break;
+                    case SDL_EVENT_QUIT:
+                        done = 1;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
             /* Draw a background pattern in case the image has transparency */
             draw_background(renderer, (int)w, (int)h);
 
