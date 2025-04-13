@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16...3.28)
+cmake_minimum_required(VERSION 3.16...4.0)
 
 if(NOT DEFINED CMAKE_BUILD_TYPE)
     set(cmake_build_type_undefined 1)
@@ -1190,23 +1190,28 @@ if(SDLIMAGE_INSTALL)
 endif()
 
 if(SDLIMAGE_SAMPLES)
-    add_executable(showanim examples/showanim.c)
-    add_executable(showimage examples/showimage.c)
-
-    foreach(prog showanim showimage)
-        sdl_add_warning_options(${prog} WARNING_AS_ERROR ${SDLIMAGE_WERROR})
-        target_link_libraries(${prog} PRIVATE SDL3_image::${sdl3_image_target_name})
-        target_link_libraries(${prog} PRIVATE ${sdl3_target_name})
+    function(add_sdl_image_example_executable TARGET)
+        if(ANDROID)
+            add_library(${TARGET} SHARED ${ARGN})
+        else()
+            add_executable(${TARGET} ${ARGN})
+        endif()
+        sdl_add_warning_options(${TARGET} WARNING_AS_ERROR ${SDLIMAGE_WERROR})
+        sdl_target_link_options_no_undefined(${TARGET})
+        target_link_libraries(${TARGET} PRIVATE SDL3_image::${sdl3_image_target_name})
+        target_link_libraries(${TARGET} PRIVATE ${sdl3_target_name})
 
         if(SDLIMAGE_SAMPLES_INSTALL)
-            install(TARGETS ${prog}
-                RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            install(TARGETS ${TARGET}
+                RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/installed-tests/SDL3_image"
             )
             if(MSVC)
-                SDL_install_pdb("${prog}" "${pdbdir}")
+                SDL_install_pdb("${TARGET}" "${CMAKE_INSTALL_LIBEXECDIR}/installed-tests/SDL3_image")
             endif()
         endif()
-    endforeach()
+    endfunction()
+    add_sdl_image_example_executable(showanim examples/showanim.c)
+    add_sdl_image_example_executable(showimage examples/showimage.c)
 endif()
 
 if(SDLIMAGE_TESTS)
