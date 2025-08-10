@@ -129,8 +129,12 @@ option(SDLIMAGE_XPM "Support loading XPM images" ON)
 option(SDLIMAGE_XV "Support loading XV images" ON)
 
 cmake_dependent_option(SDLIMAGE_AVIF_SAVE "Add AVIF save support" ON SDLIMAGE_AVIF OFF)
+cmake_dependent_option(SDLIMAGE_BMP_SAVE "Add BMP save support" ON SDLIMAGE_BMP OFF)
+cmake_dependent_option(SDLIMAGE_GIF_SAVE "Add GIF save support" ON SDLIMAGE_GIF OFF)
 cmake_dependent_option(SDLIMAGE_JPG_SAVE "Add JPEG save support" ON SDLIMAGE_JPG OFF)
 cmake_dependent_option(SDLIMAGE_PNG_SAVE "Add PNG save support" ON SDLIMAGE_PNG OFF)
+cmake_dependent_option(SDLIMAGE_TGA_SAVE "Add TGA save support" ON SDLIMAGE_TGA OFF)
+cmake_dependent_option(SDLIMAGE_WEBP_SAVE "Add WEBP save support" ON SDLIMAGE_WEBP OFF)
 
 set(LIBAVIF_MINIMUM_VERSION "1.0")
 if(SDLIMAGE_VENDORED AND SDLIMAGE_AVIF)
@@ -275,6 +279,7 @@ add_library(${sdl3_image_target_name}
     src/IMG_xcf.c
     src/IMG_xpm.c
     src/IMG_xv.c
+    src/IMG_libpng.c
 )
 add_library(SDL3_image::${sdl3_image_target_name} ALIAS ${sdl3_image_target_name})
 if(NOT TARGET SDL3_image::SDL3_image)
@@ -562,7 +567,7 @@ if(SDLIMAGE_AVIF)
     if(SDLIMAGE_AVIF_ENABLED)
         target_compile_definitions(${sdl3_image_target_name} PRIVATE
             LOAD_AVIF
-            SDL_IMAGE_SAVE_AVIF=$<BOOL:${SDLIMAGE_AVIF_SAVE}>
+            SAVE_AVIF=$<BOOL:${SDLIMAGE_AVIF_SAVE}>
         )
         if(SDLIMAGE_AVIF_SHARED)
             if(NOT DEFINED SDLIMAGE_DYNAMIC_AVIF)
@@ -591,14 +596,30 @@ list(APPEND SDLIMAGE_BACKENDS BMP)
 set(SDLIMAGE_BMP_ENABLED FALSE)
 if(SDLIMAGE_BMP)
     set(SDLIMAGE_BMP_ENABLED TRUE)
-    target_compile_definitions(${sdl3_image_target_name} PRIVATE LOAD_BMP)
+    if(SDLIMAGE_BMP_ENABLED)
+        target_compile_definitions(${sdl3_image_target_name} PRIVATE
+            LOAD_BMP
+            SAVE_BMP=$<BOOL:${SDLIMAGE_BMP_SAVE}>
+        )
+    else()
+        # Variable is used by test suite
+        set(SDLIMAGE_BMP_SAVE OFF)
+    endif()
 endif()
 
 list(APPEND SDLIMAGE_BACKENDS GIF)
 set(SDLIMAGE_GIF_ENABLED FALSE)
 if(SDLIMAGE_GIF)
     set(SDLIMAGE_GIF_ENABLED TRUE)
-    target_compile_definitions(${sdl3_image_target_name} PRIVATE LOAD_GIF)
+    if(SDLIMAGE_GIF_ENABLED)
+        target_compile_definitions(${sdl3_image_target_name} PRIVATE
+            LOAD_GIF
+            SAVE_GIF=$<BOOL:${SDLIMAGE_GIF_SAVE}>
+        )
+    else()
+        # Variable is used by test suite
+        set(SDLIMAGE_GIF_SAVE OFF)
+    endif()
 endif()
 
 list(APPEND SDLIMAGE_BACKENDS JPG)
@@ -660,7 +681,7 @@ if(SDLIMAGE_JPG)
     if(SDLIMAGE_JPG_ENABLED)
         target_compile_definitions(${sdl3_image_target_name} PRIVATE
             LOAD_JPG
-            SDL_IMAGE_SAVE_JPG=$<BOOL:${SDLIMAGE_JPG_SAVE}>
+            SAVE_JPG=$<BOOL:${SDLIMAGE_JPG_SAVE}>
         )
     else()
         # Variable is used by test suite
@@ -834,7 +855,7 @@ if(SDLIMAGE_PNG)
                 endif()
                 target_get_dynamic_library(SDLIMAGE_DYNAMIC_PNG PNG::PNG)
                 message(STATUS "Dynamic libpng: ${SDLIMAGE_DYNAMIC_PNG}")
-                target_compile_definitions(${sdl3_image_target_name} PRIVATE "LOAD_PNG_DYNAMIC=\"${SDLIMAGE_DYNAMIC_PNG}\"")
+                target_compile_definitions(${sdl3_image_target_name} PRIVATE "LOAD_LIBPNG_DYNAMIC=\"${SDLIMAGE_DYNAMIC_PNG}\"")
             else()
                 target_link_libraries(${sdl3_image_target_name} PRIVATE PNG::PNG)
             endif()
@@ -843,8 +864,13 @@ if(SDLIMAGE_PNG)
     if(SDLIMAGE_PNG_ENABLED)
         target_compile_definitions(${sdl3_image_target_name} PRIVATE
             LOAD_PNG
-            SDL_IMAGE_SAVE_PNG=$<BOOL:${SDLIMAGE_PNG_SAVE}>
+            SAVE_PNG=$<BOOL:${SDLIMAGE_PNG_SAVE}>
         )
+        if(NOT(SDLIMAGE_BACKEND_STB OR SDLIMAGE_BACKEND_WIC OR SDLIMAGE_BACKEND_IMAGEIO))
+            target_compile_definitions(${sdl3_image_target_name} PRIVATE
+                SDL_IMAGE_LIBPNG
+            )
+        endif()
     else()
         # Variable is used by test suite
         set(SDLIMAGE_PNG_SAVE OFF)
@@ -876,7 +902,15 @@ list(APPEND SDLIMAGE_BACKENDS TGA)
 set(SDLIMAGE_TGA_ENABLED FALSE)
 if(SDLIMAGE_TGA)
     set(SDLIMAGE_TGA_ENABLED TRUE)
-    target_compile_definitions(${sdl3_image_target_name} PRIVATE LOAD_TGA)
+    if(SDLIMAGE_TGA_ENABLED)
+      target_compile_definitions(${sdl3_image_target_name} PRIVATE
+          LOAD_TGA
+          SAVE_TGA=$<BOOL:${SDLIMAGE_TGA_SAVE}>
+      )
+    else()
+      # Variable is used by test suite
+      set(SDLIMAGE_TGA_SAVE OFF)
+    endif()
 endif()
 
 list(APPEND SDLIMAGE_BACKENDS TIF)
@@ -1013,7 +1047,10 @@ if(SDLIMAGE_WEBP)
         endif()
     endif()
     if(SDLIMAGE_WEBP_ENABLED)
-        target_compile_definitions(${sdl3_image_target_name} PRIVATE LOAD_WEBP)
+        target_compile_definitions(${sdl3_image_target_name} PRIVATE
+            LOAD_WEBP
+            SAVE_WEBP=$<BOOL:${SDLIMAGE_WEBP_SAVE}>
+        )
         if(SDLIMAGE_WEBP_SHARED)
            if(NOT DEFINED SDLIMAGE_DYNAMIC_WEBP AND NOT DEFINED SDLIMAGE_DYNAMIC_WEBPDEMUX AND NOT DEFINED SDLIMAGE_DYNAMIC_WEBPMUX)
                 target_include_directories(${sdl3_image_target_name} PRIVATE
@@ -1043,6 +1080,9 @@ if(SDLIMAGE_WEBP)
         else()
             target_link_libraries(${sdl3_image_target_name} PRIVATE WebP::webp WebP::webpdemux WebP::libwebpmux)
         endif()
+    else()
+      # Variable is used by test suite
+      set(SDLIMAGE_WEBP_SAVE OFF)
     endif()
 endif()
 
