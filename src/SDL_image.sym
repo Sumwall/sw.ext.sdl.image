@@ -41,6 +41,7 @@ SDL3_image_0.0.0 {
     IMG_SavePNG_IO;
     IMG_SaveAVIF;
     IMG_SaveAVIF_IO;
+    IMG_isANI;
     IMG_isAVIF;
     IMG_isBMP;
     IMG_isCUR;
@@ -74,6 +75,7 @@ SDL3_image_0.0.0 {
     IMG_CreateAnimationEncoderWithProperties;
     IMG_AddAnimationEncoderFrame;
     IMG_CloseAnimationEncoder;
+    IMG_LoadANIAnimation_IO;
     IMG_LoadAPNGAnimation_IO;
     IMG_LoadAVIFAnimation_IO;
     IMG_CreateAnimationDecoder;
@@ -84,5 +86,19 @@ SDL3_image_0.0.0 {
     IMG_CloseAnimationDecoder;
     IMG_GetAnimationDecoderProperties;
     IMG_GetAnimationDecoderStatus;
+    IMG_GetClipboardImage;
+    IMG_CreateAnimatedCursor;
+    IMG_SaveCUR;
+    IMG_SaveCUR_IO;
+    IMG_SaveICO;
+    IMG_SaveICO_IO;
+    IMG_SaveAnimation;
+    IMG_SaveAnimationTyped_IO;
+    IMG_SaveANIAnimation_IO;
+    IMG_SaveAPNGAnimation_IO;
+    IMG_SaveAVIFAnimation_IO;
+    IMG_SaveGIFAnimation_IO;
+    IMG_SaveWEBPAnimation_IO;
+    # extra symbols go here (don't modify this line)
   local: *;
 };

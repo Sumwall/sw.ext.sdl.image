@@ -22,6 +22,8 @@
 /* This is a AVIF image file loading framework */
 
 #include <SDL3_image/SDL_image.h>
+
+#include "IMG_avif.h"
 #include "IMG_anim_encoder.h"
 #include "IMG_anim_decoder.h"
 #include "xmlman.h"
@@ -245,8 +247,6 @@ typedef struct
 static avifResult ReadAVIFIO(struct avifIO * io, uint32_t readFlags, uint64_t offset, size_t size, avifROData * out)
 {
     avifIOContext *context = (avifIOContext *)io->data;
-
-    (void) readFlags;   /* not used */
 
     /* The AVIF reader bounces all over, so always seek to the correct offset */
     if (SDL_SeekIO(context->src, context->start + offset, SDL_IO_SEEK_SET) < 0) {
@@ -718,52 +718,65 @@ done:
 /* See if an image is contained in a data source */
 bool IMG_isAVIF(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a AVIF type image from an SDL datasource */
 SDL_Surface *IMG_LoadAVIF_IO(SDL_IOStream *src)
 {
-    (void)src;
+    SDL_SetError("SDL_image built without AVIF support");
     return NULL;
 }
 
 #endif /* LOAD_AVIF */
 
-bool IMG_SaveAVIF(SDL_Surface *surface, const char *file, int quality)
-{
-    SDL_IOStream *dst = SDL_IOFromFile(file, "wb");
-    if (dst) {
-        return IMG_SaveAVIF_IO(surface, dst, 1, quality);
-    } else {
-        return false;
-    }
-}
+#if SAVE_AVIF
 
 bool IMG_SaveAVIF_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio, int quality)
 {
     bool result = false;
 
+    if (!surface) {
+        SDL_InvalidParamError("surface");
+        goto done;
+    }
     if (!dst) {
-        return SDL_SetError("Passed NULL dst");
+        SDL_InvalidParamError("dst");
+        goto done;
     }
 
-#ifdef SAVE_AVIF
-    if (!result) {
-        result = IMG_SaveAVIF_IO_libavif(surface, dst, quality);
-    }
-#else
-    (void) surface;
-    (void) quality;
-    result = SDL_SetError("SDL_image built without AVIF save support");
-#endif
+    result = IMG_SaveAVIF_IO_libavif(surface, dst, quality);
 
+done:
     if (closeio) {
-        SDL_CloseIO(dst);
+        result &= SDL_CloseIO(dst);
     }
     return result;
 }
+
+bool IMG_SaveAVIF(SDL_Surface *surface, const char *file, int quality)
+{
+    SDL_IOStream *dst = SDL_IOFromFile(file, "wb");
+    if (dst) {
+        return IMG_SaveAVIF_IO(surface, dst, true, quality);
+    } else {
+        return false;
+    }
+}
+
+#else
+
+bool IMG_SaveAVIF_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio, int quality)
+{
+    return SDL_SetError("SDL_image built without AVIF save support");
+}
+
+bool IMG_SaveAVIF(SDL_Surface *surface, const char *file, int quality)
+{
+    return SDL_SetError("SDL_image built without AVIF save support");
+}
+
+#endif // SAVE_AVIF
 
 #ifdef LOAD_AVIF
 
@@ -810,11 +823,6 @@ static void SetHDRProperties(SDL_Surface *surface, const avifImage *image)
         SDL_SetFloatProperty(props, SDL_PROP_SURFACE_SDR_WHITE_POINT_FLOAT, DEFAULT_PQ_SDR_WHITE_POINT);
         SDL_SetFloatProperty(props, SDL_PROP_SURFACE_HDR_HEADROOM_FLOAT, (float)maxCLL / DEFAULT_PQ_SDR_WHITE_POINT);
     }
-}
-
-IMG_Animation *IMG_LoadAVIFAnimation_IO(SDL_IOStream *src)
-{
-  return IMG_DecodeAsAnimation(src, "avifs", 0);
 }
 
 struct IMG_AnimationDecoderContext
@@ -1052,7 +1060,7 @@ bool IMG_CreateAVIFAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_Propertie
 
     IMG_AnimationDecoderContext *ctx = (IMG_AnimationDecoderContext *)SDL_calloc(1, sizeof(*ctx));
     if (!ctx) {
-        return SDL_SetError("Out of memory for AVIF decoder context");
+        return false;
     }
 
     ctx->start_pos = SDL_TellIO(decoder->src);
@@ -1165,18 +1173,9 @@ bool IMG_CreateAVIFAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_Propertie
 
 #else
 
-IMG_Animation* IMG_LoadAVIFAnimation_IO(SDL_IOStream* src)
-{
-    (void)src;
-    SDL_SetError("SDL_image built without AVIF animation loading support");
-    return NULL;
-}
-
 bool IMG_CreateAVIFAnimationDecoder(IMG_AnimationDecoder* decoder, SDL_PropertiesID props)
 {
-    (void)decoder;
-    (void)props;
-    return SDL_SetError("SDL_image built without AVIF animation loading support");
+    return SDL_SetError("SDL_image built without AVIF animation support");
 }
 
 #endif /* LOAD_AVIF */
@@ -1190,7 +1189,7 @@ struct IMG_AnimationEncoderContext
     SDL_PropertiesID metadata;
 };
 
-static bool AnimationEncoder_AddFrame(struct IMG_AnimationEncoder *encoder, SDL_Surface *surface, Uint64 duration)
+static bool AnimationEncoder_AddFrame(IMG_AnimationEncoder *encoder, SDL_Surface *surface, Uint64 duration)
 {
     avifImage *image = NULL;
     avifRGBImage rgb;
@@ -1236,10 +1235,10 @@ static bool AnimationEncoder_AddFrame(struct IMG_AnimationEncoder *encoder, SDL_
         avifResult ar = lib.avifImageSetMetadataXMP(image, xmp_data, outlen);
         if (ar != AVIF_RESULT_OK) {
             lib.avifImageDestroy(image);
-            SDL_free((void *)xmp_data);
+            SDL_free(xmp_data);
             return SDL_SetError("Couldn't set XMP metadata for AVIF image: %s", lib.avifResultToString(ar));
         }
-        SDL_free((void *)xmp_data);
+        SDL_free(xmp_data);
     }
 
     image->yuvRange = AVIF_RANGE_FULL;
@@ -1617,7 +1616,7 @@ bool IMG_CreateAVIFAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_Propertie
         if (!SDL_CopyProperties(props, ctx->metadata)) {
             lib.avifEncoderDestroy(ctx->encoder);
             SDL_DestroyProperties(ctx->metadata);
-            SDL_free((void *)ctx);
+            SDL_free(ctx);
             return SDL_SetError("Couldn't copy properties to AVIF encoder metadata");
         }
     }
@@ -1633,9 +1632,7 @@ bool IMG_CreateAVIFAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_Propertie
 
 bool IMG_CreateAVIFAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_PropertiesID props)
 {
-    (void)encoder;
-    (void)props;
-    return SDL_SetError("SDL_image built without AVIF animation encoding support");
+    return SDL_SetError("SDL_image built without AVIF animation save support");
 }
 
 #endif /* SAVE_AVIF */

@@ -10,7 +10,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 set(MAJOR_VERSION 3)
 set(MINOR_VERSION 3)
 set(MICRO_VERSION 0)
-set(SDL_REQUIRED_VERSION 3.2.6)
+set(SDL_REQUIRED_VERSION 3.3.0)
 
 project(SDL3_image
     LANGUAGES C
@@ -110,6 +110,7 @@ option(SDLIMAGE_BACKEND_STB "Use stb_image for loading JPEG and PNG files" ON)
 cmake_dependent_option(SDLIMAGE_BACKEND_WIC "Add WIC backend (Windows Imaging Component)" OFF WIN32 OFF)
 cmake_dependent_option(SDLIMAGE_BACKEND_IMAGEIO "Use native Mac OS X frameworks for loading images" ON APPLE OFF)
 
+option(SDLIMAGE_ANI "Support loading ANI animations" ON)
 option(SDLIMAGE_AVIF "Support loading AVIF images" ON)
 option(SDLIMAGE_BMP "Support loading BMP images" ON)
 option(SDLIMAGE_GIF "Support loading GIF images" ON)
@@ -128,6 +129,7 @@ option(SDLIMAGE_XCF "Support loading XCF images" ON)
 option(SDLIMAGE_XPM "Support loading XPM images" ON)
 option(SDLIMAGE_XV "Support loading XV images" ON)
 
+cmake_dependent_option(SDLIMAGE_ANI_SAVE "Add ANI save support" ON SDLIMAGE_ANI OFF)
 cmake_dependent_option(SDLIMAGE_AVIF_SAVE "Add AVIF save support" ON SDLIMAGE_AVIF OFF)
 cmake_dependent_option(SDLIMAGE_BMP_SAVE "Add BMP save support" ON SDLIMAGE_BMP OFF)
 cmake_dependent_option(SDLIMAGE_GIF_SAVE "Add GIF save support" ON SDLIMAGE_GIF OFF)
@@ -260,6 +262,7 @@ set(BUILD_SHARED_LIBS ${SDLIMAGE_BUILD_SHARED_LIBS})
 add_library(${sdl3_image_target_name}
     src/IMG.c
     src/IMG_WIC.c
+    src/IMG_ani.c
     src/IMG_anim_encoder.c
     src/IMG_anim_decoder.c
     src/IMG_avif.c
@@ -303,6 +306,8 @@ target_compile_definitions(${sdl3_image_target_name} PRIVATE
     SDL_BUILD_MINOR_VERSION=${MINOR_VERSION}
     SDL_BUILD_MICRO_VERSION=${MICRO_VERSION}
 )
+# Make sure SDL3's include directory comes first
+target_include_directories(${sdl3_image_target_name} PRIVATE $<TARGET_PROPERTY:SDL3::Headers,INTERFACE_INCLUDE_DIRECTORIES>)
 target_link_libraries(${sdl3_image_target_name} PUBLIC SDL3::Headers)
 if(SDLIMAGE_BUILD_SHARED_LIBS)
     target_link_libraries(${sdl3_image_target_name} PRIVATE SDL3::SDL3-shared)
@@ -331,12 +336,15 @@ if(NOT ANDROID)
         VERSION "${SO_VERSION}"
     )
     if(APPLE)
-        cmake_minimum_required(VERSION 3.17...3.28)
         set_target_properties(${sdl3_image_target_name} PROPERTIES
             MACHO_COMPATIBILITY_VERSION "${DYLIB_COMPAT_VERSION}"
             MACHO_CURRENT_VERSION "${DYLIB_CURRENT_VERSION}"
         )
         sdl_no_deprecated_errors(${sdl3_image_target_name})
+        set_property(TARGET ${sdl3_image_target_name} APPEND PROPERTY LINK_DEPENDS
+            "${PROJECT_SOURCE_DIR}/src/SDL_image.exports")
+        target_link_options(${sdl3_image_target_name} PRIVATE
+            "SHELL:-Wl,-exported_symbols_list,${PROJECT_SOURCE_DIR}/src/SDL_image.exports")
     endif()
 endif()
 if(SDLIMAGE_BUILD_SHARED_LIBS)
@@ -591,6 +599,21 @@ if(SDLIMAGE_AVIF)
     else()
         # Variable is used by test suite
         set(SDLIMAGE_AVIF_SAVE OFF)
+    endif()
+endif()
+
+list(APPEND SDLIMAGE_BACKENDS ANI)
+set(SDLIMAGE_ANI_ENABLED FALSE)
+if(SDLIMAGE_ANI)
+    set(SDLIMAGE_ANI_ENABLED TRUE)
+    if(SDLIMAGE_ANI_ENABLED)
+        target_compile_definitions(${sdl3_image_target_name} PRIVATE
+            LOAD_ANI
+            SAVE_ANI=$<BOOL:${SDLIMAGE_ANI_SAVE}>
+        )
+    else()
+        # Variable is used by test suite
+        set(SDLIMAGE_ANI_SAVE OFF)
     endif()
 endif()
 
@@ -924,8 +947,12 @@ if(SDLIMAGE_TIF)
         if(SDLIMAGE_TIF_VENDORED)
             set(SDLIMAGE_TIF_ENABLED TRUE)
             message(STATUS "${PROJECT_NAME}: Using vendored libtiff")
+            # tiff-cxx variable is used by vendored libtiff
+            set(tiff-cxx OFF CACHE BOOL "libtiff: C++ API" FORCE)
             # tiff-tests variable is used by vendored libtiff
             set(tiff-tests OFF CACHE BOOL "libtiff: tests" FORCE)
+            # tiff-opengl variable is used by vendored libtiff
+            set(tiff-opengl OFF CACHE BOOL "libtiff: OpenGL option" FORCE)
             # jpeg variable is used by vendored libtiff
             set(jpeg OFF CACHE BOOL "libtiff: jpeg option" FORCE)
             # libdeflate variable is used by vendored libtiff
@@ -936,6 +963,8 @@ if(SDLIMAGE_TIF)
             set(zlib OFF CACHE BOOL "libtiff: find zlib using find_package" FORCE)
             # ZLIB_FOUND is used by vendored libtiff
             set(ZLIB_FOUND "")
+            # lerc variable is used by vendored libtiff
+            set(lerc OFF CACHE BOOL "libtiff: lerc option" FORCE)
             # lzma variable is used by vendored libtiff
             set(lzma OFF CACHE BOOL "libtiff: lzma option" FORCE)
             # webp variable is used by vendored libtiff
@@ -1283,6 +1312,7 @@ if(SDLIMAGE_SAMPLES)
     endfunction()
     add_sdl_image_example_executable(showanim examples/showanim.c)
     add_sdl_image_example_executable(showimage examples/showimage.c)
+    add_sdl_image_example_executable(showclipboard examples/showclipboard.c)
 endif()
 
 if(SDLIMAGE_TESTS)

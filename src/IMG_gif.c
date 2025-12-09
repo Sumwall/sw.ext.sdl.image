@@ -22,6 +22,8 @@
 /* This is a GIF image file loading framework */
 
 #include <SDL3_image/SDL_image.h>
+
+#include "IMG_gif.h"
 #include "IMG_anim_encoder.h"
 #include "IMG_anim_decoder.h"
 
@@ -39,10 +41,10 @@
 
 #ifdef LOAD_GIF
 
-/* Code from here to end of file has been adapted from XPaint:           */
+/*        Some parts of the code have been adapted from XPaint:          */
 /* +-------------------------------------------------------------------+ */
-/* | Copyright 1990, 1991, 1993 David Koblas.                  | */
-/* | Copyright 1996 Torsten Martinsen.                     | */
+/* | Copyright 1990, 1991, 1993 David Koblas.                          | */
+/* | Copyright 1996 Torsten Martinsen.                                 | */
 /* |   Permission to use, copy, modify, and distribute this software   | */
 /* |   and its documentation for any purpose and without fee is hereby | */
 /* |   granted, provided that the above copyright notice appear in all | */
@@ -58,6 +60,9 @@
    Use SDL_Surface rather than xpaint Image structure
    Define SDL versions of RWSetMsg(), ImageNewCmap() and ImageSetCmap()
 */
+
+/* Has been overwhelmingly modified by Xen (@lordofxen) and Sam Lantinga (@slouken) as of 11/9/2025. */
+
 #include <SDL3/SDL.h>
 
 #define Image           SDL_Surface
@@ -147,9 +152,9 @@ static int DoExtension(SDL_IOStream * src, int label, State_t * state);
 static int GetDataBlock(SDL_IOStream * src, unsigned char *buf, State_t * state);
 static int GetCode(SDL_IOStream * src, int code_size, int flag, State_t * state);
 static int LWZReadByte(SDL_IOStream * src, int flag, int input_code_size, State_t * state);
-static Image *ReadImage(SDL_IOStream * src, int len, int height, int,
-			unsigned char cmap[3][MAXCOLORMAPSIZE],
-			int gray, int interlace, int ignore, State_t * state);
+static Image *ReadImage(SDL_IOStream *src, int len, int height, int cmapSize,
+          unsigned char cmap[3][MAXCOLORMAPSIZE],
+          int gray, int interlace, int ignore, State_t *state);
 
 static int
 ReadColorMap(SDL_IOStream *src, int number,
@@ -408,8 +413,6 @@ ReadImage(SDL_IOStream * src, int len, int height, int cmapSize,
     int i, v;
     int xpos = 0, ypos = 0, pass = 0;
 
-    (void) gray; /* unused */
-
     /*
     **  Initialize the compression routines
      */
@@ -444,6 +447,10 @@ ReadImage(SDL_IOStream * src, int len, int height, int cmapSize,
     palette->ncolors = cmapSize;
     for (i = 0; i < cmapSize; i++) {
         ImageSetCmap(image, i, cmap[CM_RED][i], cmap[CM_GREEN][i], cmap[CM_BLUE][i]);
+    }
+
+    if (state->Gif89.transparent >= 0 && state->Gif89.transparent < cmapSize) {
+        SDL_SetSurfaceColorKey(image, true, state->Gif89.transparent);
     }
 
     while ((v = LWZReadByte(src, FALSE, c, state)) >= 0) {
@@ -494,12 +501,6 @@ ReadImage(SDL_IOStream * src, int len, int height, int cmapSize,
     return image;
 }
 
-/* Load a GIF type animation from an SDL datasource */
-IMG_Animation *IMG_LoadGIFAnimation_IO(SDL_IOStream *src)
-{
-    return IMG_DecodeAsAnimation(src, "gif", 0);
-}
-
 struct IMG_AnimationDecoderContext
 {
     State_t state;                /* GIF decoding state */
@@ -538,40 +539,7 @@ struct IMG_AnimationDecoderContext
     bool ignore_props;
 };
 
-static bool IMG_AnimationDecoderReset_Internal(IMG_AnimationDecoder *decoder)
-{
-    IMG_AnimationDecoderContext* ctx = decoder->ctx;
-    if (SDL_SeekIO(decoder->src, decoder->start, SDL_IO_SEEK_SET) < 0) {
-        return SDL_SetError("Failed to seek to beginning of GIF file");
-    }
-
-    SDL_memset(&ctx->state, 0, sizeof(ctx->state));
-    ctx->state.Gif89.transparent = -1;
-    ctx->state.Gif89.delayTime = -1;
-    ctx->state.Gif89.inputFlag = -1;
-    ctx->state.Gif89.disposal = GIF_DISPOSE_NA;
-
-    ctx->current_frame = 0;
-    ctx->current_disposal = GIF_DISPOSE_NA;
-    ctx->current_delay = 100;
-    ctx->transparent_index = -1;
-    ctx->got_header = false;
-    ctx->got_eof = false;
-    ctx->last_disposal = GIF_DISPOSE_NONE;
-    ctx->restore_frame = 0;
-
-    if (ctx->canvas) {
-        SDL_FillSurfaceRect(ctx->canvas, NULL, 0);
-    }
-
-    if (ctx->prev_canvas) {
-        SDL_FillSurfaceRect(ctx->prev_canvas, NULL, 0);
-    }
-
-    return true;
-}
-
-static bool IMG_AnimationDecoderGetGIFHeader(IMG_AnimationDecoder *decoder, const char** comment, int* loopCount)
+static bool IMG_AnimationDecoderGetGIFHeader(IMG_AnimationDecoder *decoder, char**comment, int *loopCount)
 {
     if (comment) {
         *comment = NULL;
@@ -715,7 +683,7 @@ static bool IMG_AnimationDecoderGetGIFHeader(IMG_AnimationDecoder *decoder, cons
                                 c[current_len] = '\0';
                             }
 
-                            *comment = (const char *)c;
+                            *comment = c;
                         }
                     } break;
 
@@ -772,6 +740,42 @@ static bool IMG_AnimationDecoderGetGIFHeader(IMG_AnimationDecoder *decoder, cons
         ctx->got_header = true;
     }
     return true;
+}
+
+static bool IMG_AnimationDecoderReset_Internal(IMG_AnimationDecoder *decoder)
+{
+    IMG_AnimationDecoderContext* ctx = decoder->ctx;
+    if (SDL_SeekIO(decoder->src, decoder->start, SDL_IO_SEEK_SET) != decoder->start) {
+        return SDL_SetError("Failed to seek to beginning of GIF file");
+    }
+
+    SDL_memset(&ctx->state, 0, sizeof(ctx->state));
+    ctx->state.Gif89.transparent = -1;
+    ctx->state.Gif89.delayTime = -1;
+    ctx->state.Gif89.inputFlag = -1;
+    ctx->state.Gif89.disposal = GIF_DISPOSE_NA;
+
+    ctx->current_frame = 0;
+    ctx->current_disposal = GIF_DISPOSE_NA;
+    ctx->current_delay = 100;
+    ctx->transparent_index = -1;
+    ctx->got_header = false;
+    ctx->got_eof = false;
+    ctx->last_disposal = GIF_DISPOSE_NONE;
+    ctx->restore_frame = 0;
+
+    // We don't care about metadata when resetting to re-read.
+    ctx->ignore_props = true;
+
+    if (ctx->canvas) {
+        SDL_FillSurfaceRect(ctx->canvas, NULL, 0);
+    }
+
+    if (ctx->prev_canvas) {
+        SDL_FillSurfaceRect(ctx->prev_canvas, NULL, 0);
+    }
+
+    return IMG_AnimationDecoderGetGIFHeader(decoder, NULL, NULL);
 }
 
 static bool IMG_AnimationDecoderGetNextFrame_Internal(IMG_AnimationDecoder *decoder, SDL_Surface **frame, Uint64 *duration)
@@ -881,19 +885,18 @@ static bool IMG_AnimationDecoderGetNextFrame_Internal(IMG_AnimationDecoder *deco
                               BitSet(ctx->buf[8], INTERLACE), 0, &ctx->state);
         }
 
-        if (!image) {
-            // TODO:
-            // Error reading image, but we'll continue with what we have, or should we??
-            continue;
-        }
+      if (!image) {
+          // Incorrect animation is harder to detect than a direct failure,
+          // so it's better to fail than try to animate a GIF without a,
+          // full set of frames it has in the file.
 
-        /* Apply transparency if needed */
-        if (ctx->state.Gif89.transparent >= 0) {
-            if (!SDL_SetSurfaceColorKey(image, true, ctx->state.Gif89.transparent)) {
-                SDL_DestroySurface(image);
-                return SDL_SetError("Failed to set transparency on frame");
-            }
-        }
+          // Only set the error if ReadImage did not do it.
+          if (SDL_GetError()[0] == '\0') {
+              return SDL_SetError("Failed to decode frame.");
+          }
+
+          return false;
+      }
 
         /* Composite the frame onto the canvas */
         SDL_Rect dest = { left, top, width, height };
@@ -989,7 +992,7 @@ bool IMG_CreateGIFAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_Properties
     decoder->GetNextFrame = IMG_AnimationDecoderGetNextFrame_Internal;
     decoder->Close = IMG_AnimationDecoderClose_Internal;
 
-    const char *comment;
+    char *comment = NULL;
     int loop_count = 0;
     if (!IMG_AnimationDecoderGetGIFHeader(decoder, &comment, &loop_count)) {
         return false;
@@ -1006,28 +1009,16 @@ bool IMG_CreateGIFAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_Properties
             SDL_SetStringProperty(decoder->props, IMG_PROP_METADATA_DESCRIPTION_STRING, comment);
         }
     }
-
-    if (comment) {
-        SDL_free((void *)comment);
-        comment = NULL;
-    }
+    SDL_free(comment);
 
     return true;
 }
 
 #else
 
-/* Load a GIF type animation from an SDL datasource */
-IMG_Animation *IMG_LoadGIFAnimation_IO(SDL_IOStream *src)
-{
-    (void)src;
-    return NULL;
-}
-
 bool IMG_CreateGIFAnimationDecoder(IMG_AnimationDecoder *decoder, SDL_PropertiesID props)
 {
-    (void)decoder;
-    (void)props;
+    SDL_SetError("SDL_image built without GIF support");
     return false;
 }
 
@@ -1082,14 +1073,13 @@ SDL_Surface *IMG_LoadGIF_IO(SDL_IOStream *src)
 /* See if an image is contained in a data source */
 bool IMG_isGIF(SDL_IOStream *src)
 {
-    (void)src;
     return false;
 }
 
 /* Load a GIF type image from an SDL datasource */
 SDL_Surface *IMG_LoadGIF_IO(SDL_IOStream *src)
 {
-    (void)src;
+    SDL_SetError("SDL_image built without GIF support");
     return NULL;
 }
 
@@ -1884,7 +1874,7 @@ static int mapSurfaceToExistingPalette(SDL_Surface *psurf, uint8_t lut[32][32][3
     return 0;
 }
 
-static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][3], uint16_t numPaletteColors, uint8_t *indexedPixels)
+static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][3], uint16_t numPaletteColors, uint8_t *indexedPixels, int transparentIndex)
 {
     if (!psurf || !palette || !indexedPixels || numPaletteColors == 0 || (numPaletteColors & (numPaletteColors - 1)) != 0) {
         SDL_SetError("Invalid arguments for quantizeSurfaceToIndexedPixels: numPaletteColors must be a power of 2.");
@@ -1894,7 +1884,6 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
     bool surface_converted = false;
     bool surface_locked = false;
     bool hasTransparency = false;
-    uint8_t transparentIndex = numPaletteColors - 1;
     SDL_Surface *surf = psurf;
 
 #if !SAVE_GIF_OCTREE
@@ -1910,7 +1899,7 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
     }
 
     Uint32 colorKey = 0;
-    if (SDL_SurfaceHasColorKey(surf)) {
+    if (transparentIndex >= 0 && SDL_SurfaceHasColorKey(surf)) {
         SDL_GetSurfaceColorKey(surf, &colorKey);
         hasTransparency = true;
     }
@@ -1993,16 +1982,18 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
     return 0;
 #else
 
-    Uint32 colorKey = 0;
-    if (SDL_SurfaceHasColorKey(surf)) {
-        SDL_GetSurfaceColorKey(surf, &colorKey);
-        hasTransparency = true;
-    }
-
     const SDL_PixelFormatDetails *pixelFormatDetails = SDL_GetPixelFormatDetails(surf->format);
     if (!pixelFormatDetails) {
         SDL_SetError("Failed to get pixel format details for original surface.");
         return -1;
+    }
+
+    Uint32 colorKey = 0;
+    if (transparentIndex >= 0) {
+        if (SDL_SurfaceHasColorKey(psurf)) {
+            SDL_GetSurfaceColorKey(psurf, &colorKey);
+        }
+        hasTransparency = true;
     }
 
     if (surf->format == SDL_PIXELFORMAT_INDEX8) {
@@ -2138,6 +2129,7 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
             SDL_SetError("Failed to create Octree root node.");
             return -1;
         }
+
         root->pixelCount = 0;
         root->rSum = 0;
         root->gSum = 0;
@@ -2152,12 +2144,28 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
         const int g_bpp = count_set_bits(pixelFormatDetails->Gmask);
         const int b_bpp = count_set_bits(pixelFormatDetails->Bmask);
 
+        const Uint32 current_Amask = pixelFormatDetails->Amask;
+        const Uint8 current_Ashift = pixelFormatDetails->Ashift;
+        const int current_a_bpp = (current_Amask == 0) ? 0 : count_set_bits(current_Amask);
+
         for (int y = 0; y < surf->h; ++y) {
             uint32_t *src_row = (uint32_t *)((uint8_t *)surf->pixels + y * surf->pitch);
             for (int x = 0; x < surf->w; ++x) {
                 uint32_t pixel = src_row[x];
 
-                if (hasTransparency && (pixel == colorKey)) {
+                bool isTransparent = false;
+                if (hasTransparency) {
+                    if (current_Amask != 0 && current_a_bpp > 0) {
+                        uint8_t a = (uint8_t)(((pixel & current_Amask) >> current_Ashift) << (8 - current_a_bpp));
+                        if (a < 128) { // Alpha threshold
+                            isTransparent = true;
+                        }
+                    } else if (SDL_SurfaceHasColorKey(psurf) && (pixel == colorKey)) {
+                        isTransparent = true;
+                    }
+                }
+
+                if (isTransparent) {
                     continue;
                 } else {
                     uint8_t r = (uint8_t)(((pixel & pixelFormatDetails->Rmask) >> pixelFormatDetails->Rshift) << (8 - r_bpp));
@@ -2203,21 +2211,22 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
             return -1;
         }
 
-        for (int y = 0; y < surf->h; ++y) {
-            uint32_t *src_row = (uint32_t *)((uint8_t *)surf->pixels + y * surf->pitch);
-            uint8_t *dst_row = indexedPixels + y * surf->w;
-            for (int x = 0; x < surf->w; ++x) {
-                uint32_t pixel = src_row[x];
-                if (hasTransparency && pixel == colorKey) {
-                    dst_row[x] = transparentIndex;
-                } else {
-                    uint8_t r = (uint8_t)(((pixel & pixelFormatDetails->Rmask) >> pixelFormatDetails->Rshift) << (8 - r_bpp));
-                    uint8_t g = (uint8_t)(((pixel & pixelFormatDetails->Gmask) >> pixelFormatDetails->Gshift) << (8 - g_bpp));
-                    uint8_t b = (uint8_t)(((pixel & pixelFormatDetails->Bmask) >> pixelFormatDetails->Bshift) << (8 - b_bpp));
-                    int index = Octree_GetPaletteIndex(octree.root, r, g, b, 0);
-                    dst_row[x] = index;
-                }
+        uint32_t destIndex = 0;
+        for (uint32_t i = 0; i < octree.paletteSize; ++i) {
+            if (hasTransparency && destIndex == (uint32_t)transparentIndex) {
+                destIndex++;
             }
+
+            palette[destIndex][0] = octree.palette[i * 3 + 0];
+            palette[destIndex][1] = octree.palette[i * 3 + 1];
+            palette[destIndex][2] = octree.palette[i * 3 + 2];
+            destIndex++;
+        }
+
+        for (uint32_t i = destIndex; i < numPaletteColors; ++i) {
+            palette[i][0] = 0;
+            palette[i][1] = 0;
+            palette[i][2] = 0;
         }
 
         if (hasTransparency) {
@@ -2226,11 +2235,41 @@ static int quantizeSurfaceToIndexedPixels(SDL_Surface *psurf, uint8_t palette[][
             palette[transparentIndex][2] = 0;
         }
 
-        for (uint32_t i = 0; i < octree.paletteSize; ++i) {
-            palette[i][0] = octree.palette[i * 3 + 0];
-            palette[i][1] = octree.palette[i * 3 + 1];
-            palette[i][2] = octree.palette[i * 3 + 2];
+        for (int y = 0; y < surf->h; ++y) {
+            uint32_t *src_row = (uint32_t *)((uint8_t *)surf->pixels + y * surf->pitch);
+            uint8_t *dst_row = indexedPixels + y * surf->w;
+            for (int x = 0; x < surf->w; ++x) {
+                uint32_t pixel = src_row[x];
+
+                bool isTransparent = false;
+                if (hasTransparency) {
+                    if (current_Amask != 0 && current_a_bpp > 0) {
+                        uint8_t a = (uint8_t)(((pixel & current_Amask) >> current_Ashift) << (8 - current_a_bpp));
+                        if (a < 128) { // Alpha threshold
+                            isTransparent = true;
+                        }
+                    } else if (SDL_SurfaceHasColorKey(psurf) && (pixel == colorKey)) {
+                        isTransparent = true;
+                    }
+                }
+
+                if (isTransparent) {
+                    dst_row[x] = transparentIndex;
+                } else {
+                    uint8_t r = (uint8_t)(((pixel & pixelFormatDetails->Rmask) >> pixelFormatDetails->Rshift) << (8 - r_bpp));
+                    uint8_t g = (uint8_t)(((pixel & pixelFormatDetails->Gmask) >> pixelFormatDetails->Gshift) << (8 - g_bpp));
+                    uint8_t b = (uint8_t)(((pixel & pixelFormatDetails->Bmask) >> pixelFormatDetails->Bshift) << (8 - b_bpp));
+                    int index = Octree_GetPaletteIndex(octree.root, r, g, b, 0);
+
+                    if (hasTransparency && index >= transparentIndex) {
+                        index++;
+                    }
+
+                    dst_row[x] = index;
+                }
+            }
         }
+
         // Clean up the octree
         Octree_Free(&octree);
         if (surface_converted) {
@@ -2541,7 +2580,7 @@ static int writeGifTrailer(SDL_IOStream *io)
     return 0;
 }
 
-static bool AnimationEncoder_AddFrame(struct IMG_AnimationEncoder *encoder, SDL_Surface *surface, Uint64 duration)
+static bool AnimationEncoder_AddFrame(IMG_AnimationEncoder *encoder, SDL_Surface *surface, Uint64 duration)
 {
     IMG_AnimationEncoderContext *ctx = encoder->ctx;
     SDL_IOStream *io = encoder->dst;
@@ -2582,7 +2621,7 @@ static bool AnimationEncoder_AddFrame(struct IMG_AnimationEncoder *encoder, SDL_
         ctx->width = (uint16_t)surface->w;
         ctx->height = (uint16_t)surface->h;
 
-        if (quantizeSurfaceToIndexedPixels(surface, ctx->globalColorTable, numColors, indexedPixels) != 0) {
+        if (quantizeSurfaceToIndexedPixels(surface, ctx->globalColorTable, numColors, indexedPixels, ctx->transparentColorIndex) != 0) {
             goto error;
         }
 
@@ -2633,7 +2672,7 @@ static bool AnimationEncoder_AddFrame(struct IMG_AnimationEncoder *encoder, SDL_
             }
         } else {
             // For subsequent frames, create a new optimal palette
-            if (quantizeSurfaceToIndexedPixels(surface, localColorTable, numColors, indexedPixels) != 0) {
+            if (quantizeSurfaceToIndexedPixels(surface, localColorTable, numColors, indexedPixels, ctx->transparentColorIndex) != 0) {
                 goto error;
             }
         }
@@ -2693,7 +2732,7 @@ error:
     return false;
 }
 
-static bool AnimationEncoder_End(struct IMG_AnimationEncoder *encoder)
+static bool AnimationEncoder_End(IMG_AnimationEncoder *encoder)
 {
     IMG_AnimationEncoderContext *ctx = encoder->ctx;
     SDL_IOStream *io = encoder->dst;
@@ -2719,13 +2758,9 @@ static bool AnimationEncoder_End(struct IMG_AnimationEncoder *encoder)
 
     return success;
 }
-#endif /* SAVE_GIF */
 
-bool IMG_CreateGIFAnimationEncoder(struct IMG_AnimationEncoder *encoder, SDL_PropertiesID props)
+bool IMG_CreateGIFAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_PropertiesID props)
 {
-#if !SAVE_GIF
-    return SDL_SetError("GIF animation saving is not enabled in this build.");
-#else
     IMG_AnimationEncoderContext *ctx;
     int transparent_index = -1;
     uint16_t num_global_colors = 256;
@@ -2733,21 +2768,21 @@ bool IMG_CreateGIFAnimationEncoder(struct IMG_AnimationEncoder *encoder, SDL_Pro
     transparent_index = (int)SDL_GetNumberProperty(props, "transparent_color_index", -1);
     Sint64 globalcolors = SDL_GetNumberProperty(props, "num_colors", 256);
     if (globalcolors <= 1 || (globalcolors & (globalcolors - 1)) != 0 || globalcolors > 256) {
-        SDL_SetError("GIF stream property 'num_colors' must be a power of 2 (starting from 2, up to 256).");
-        return false;
+        return SDL_SetError("GIF stream property 'num_colors' must be a power of 2 (starting from 2, up to 256).");
     }
 
     num_global_colors = (uint16_t)globalcolors;
 
     if (transparent_index >= (int)num_global_colors) {
-        SDL_SetError("Transparent color index %d exceeds palette size %d",
-                     transparent_index, num_global_colors);
-        return false;
+        return SDL_SetError("Transparent color index %d exceeds palette size %d", transparent_index, num_global_colors);
+    }
+
+    if (transparent_index < 0) {
+        transparent_index = num_global_colors - 1;
     }
 
     ctx = (IMG_AnimationEncoderContext *)SDL_calloc(1, sizeof(IMG_AnimationEncoderContext));
     if (!ctx) {
-        SDL_SetError("Failed to allocate animation stream context.");
         return false;
     }
 
@@ -2760,12 +2795,10 @@ bool IMG_CreateGIFAnimationEncoder(struct IMG_AnimationEncoder *encoder, SDL_Pro
     if (!ignoreProps) {
         ctx->metadata = SDL_CreateProperties();
         if (!ctx->metadata) {
-            SDL_SetError("Failed to create metadata properties for GIF encoder.");
             SDL_free(ctx);
             return false;
         }
         if (!SDL_CopyProperties(props, ctx->metadata)) {
-            SDL_SetError("Failed to copy properties to GIF encoder metadata.");
             SDL_DestroyProperties(ctx->metadata);
             SDL_free(ctx);
             return false;
@@ -2784,10 +2817,7 @@ bool IMG_CreateGIFAnimationEncoder(struct IMG_AnimationEncoder *encoder, SDL_Pro
     encoder->Close = AnimationEncoder_End;
 
     return true;
-#endif /*!SAVE_GIF*/
 }
-
-#ifdef SAVE_GIF
 
 bool IMG_SaveGIF_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio)
 {
@@ -2811,23 +2841,27 @@ bool IMG_SaveGIF_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio)
 bool IMG_SaveGIF(SDL_Surface *surface, const char *file)
 {
     SDL_IOStream *dst = SDL_IOFromFile(file, "wb");
-    return IMG_SaveGIF_IO(surface, dst, true);
+    if (dst) {
+        return IMG_SaveGIF_IO(surface, dst, true);
+    } else {
+        return false;
+    }
 }
 
 #else
 
+bool IMG_CreateGIFAnimationEncoder(IMG_AnimationEncoder *encoder, SDL_PropertiesID props)
+{
+    return SDL_SetError("SDL_image built without GIF save support");
+}
+
 bool IMG_SaveGIF_IO(SDL_Surface *surface, SDL_IOStream *dst, bool closeio)
 {
-    (void)surface;
-    (void)dst;
-    (void)closeio;
     return SDL_SetError("SDL_image built without GIF save support");
 }
 
 bool IMG_SaveGIF(SDL_Surface *surface, const char *file)
 {
-    (void)surface;
-    (void)file;
     return SDL_SetError("SDL_image built without GIF save support");
 }
 
