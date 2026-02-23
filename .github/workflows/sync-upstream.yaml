@@ -1,0 +1,78 @@
+# This workflow syncs our Sumwall's FOSS forked repositories with theirs upstream repos, not only
+# syncs the commits but also the TAGs.
+#
+name: Sync with Upstream
+
+on:
+  schedule:
+    # Run every Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+
+  workflow_dispatch: # Allows manual trigger of the workflow
+    inputs:
+      reason:
+        description: "Reason for manual sync"
+        required: false
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout your fork repository
+      #
+      - name: Checkout Fork
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch all history for tags and branches
+          token: ${{ secrets.DEVOPS_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # Step 2: Configure Git Identity
+      - name: Configure Git Identity
+        run: |
+          git config --global user.email "admin@sumwall.com"
+          git config --global user.name "Admin"
+
+      # Step 3: Get the Upstream Repository Info
+      - name: Get Upstream Info
+        id: get-upstream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch upstream URL using GitHub API
+          repo=$(echo $GITHUB_REPOSITORY | cut -d'/' -f2)
+          response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository_owner }}/$repo)
+
+          # Extract upstream URL and default branch
+          upstream_url=$(echo $response | jq -r '.parent.clone_url')
+          default_branch=$(echo $response | jq -r '.parent.default_branch')
+
+          if [ "$upstream_url" == "null" ]; then
+            echo "No upstream repository found. Exiting."
+            exit 1
+          fi
+
+          echo "url=$upstream_url" >> $GITHUB_OUTPUT
+          echo "branch=$default_branch" >> $GITHUB_OUTPUT
+
+      # Step 4: Add upstream remote dynamically
+      - name: Add Upstream Remote
+        run: git remote add upstream ${{ steps.get-upstream.outputs.url }}
+
+      # Step 5: Fetch tags and branches from upstream
+      - name: Fetch Upstream Tags and Branches
+        run: git fetch upstream --tags
+
+      # Step 6: Merge upstream's default branch into fork's default branch
+      - name: Merge Upstream into Fork
+        run: |
+          git checkout ${{ steps.get-upstream.outputs.branch }}
+          git merge upstream/${{ steps.get-upstream.outputs.branch }} || echo "No new changes to merge."
+
+      # Step 7: Push changes to our fork
+      - name: Push Changes to Fork
+        run: |
+          # Push to origin
+          git push origin ${{ steps.get-upstream.outputs.branch }}
+          git push origin --tags
